@@ -38,11 +38,25 @@ jobs:
           }
           EOF
 
-      - name: Clean, Generate Android Platform and Build APK
+      - name: Clean, Generate Android Platform and Fix Conflicts
         run: |
           rm -rf android
           npx cap add android
           npx cap copy android
+          
+          # Kotlin versiyon çakışmalarını önlemek için build.gradle dosyasına resolutionStrategy ekliyoruz
+          BUILD_GRADLE="android/build.gradle"
+          if [ -f "$BUILD_GRADLE" ]; then
+            echo "" >> "$BUILD_GRADLE"
+            echo "allprojects {" >> "$BUILD_GRADLE"
+            echo "    configurations.all {" >> "$BUILD_GRADLE"
+            echo "        resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-stdlib:1.9.24', 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.24'" >> "$BUILD_GRADLE"
+            echo "    }" >> "$BUILD_GRADLE"
+            echo "}" >> "$BUILD_GRADLE"
+          fi
+
+      - name: Build APK
+        run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
