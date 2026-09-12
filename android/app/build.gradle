@@ -1,11 +1,9 @@
 android {
     ...
-    // Çıkan APK dosyasını yeniden adlandırma kuralı
     applicationVariants.all { variant ->
         variant.outputs.all { output ->
-            def projectame = "Istanbul-Taksimetre"
-            def versionName = variant.versionName
-            outputFileName = "${projectame}-${versionName}-${variant.buildType.name}.apk"
+            def projectN = "Istanbul-Taksimetre"
+            outputFileName = "${projectN}-${variant.name}.apk"
         }
     }
 }
