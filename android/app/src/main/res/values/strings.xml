@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">İstanbul Taksimetre</string>
+    <string name="title_activity_main">İstanbul Taksimetre</string>
+    <string name="package_name">com.adil.taksimetre</string>
+    <string name="custom_url_scheme">com.adil.taksimetre</string>
+</resources>
+
