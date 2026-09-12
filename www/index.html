@@ -99,7 +99,7 @@
         <div class="modal-content">
             <h3 style="color: #3498db;">Yolculuk Detayı</h3>
             <div id="detailContent" style="font-size: 12px; line-height: 1.5; color: #ddd;"></div>
-            <button class="close-btn" onclick="document.getElementById('detailModal').style.display = 'none';">Geri</button>
+            <button class="close-dfn close-btn" onclick="document.getElementById('detailModal').style.display = 'none';">Geri</button>
         </div>
     </div>
 
@@ -163,22 +163,32 @@
 
                 watchId = navigator.geolocation.watchPosition(async (pos) => {
                     let lat = pos.coords.latitude, lon = pos.coords.longitude, acc = pos.coords.accuracy;
-                    if (lastLat === null) {
-                        lastLat = lat; lastLon = lon;
+                    
+                    // İlk geçerli konumu direkt başlangıç kabul et
+                    if (lastLat === null || lastLon === null) {
+                        lastLat = lat; 
+                        lastLon = lon;
                         startAddressText = await getAddress(lat, lon);
                         document.getElementById('statusText').innerText = `GPS Aktif (~${Math.round(acc)}m)`;
                         return;
                     }
-                    if (acc > 45) return; 
+
+                    // Hassasiyet filtresi (Çok sapmalı GPS verilerini ele)
+                    if (acc > 50) return; 
+
                     let dist = calculateDistance(lastLat, lastLon, lat, lon);
-                    if (dist > 4) {
+                    
+                    // 2 metreden fazla hareket edildiyse mesafeye ekle (titreşimleri engellemek için)
+                    if (dist > 2) {
                         totalKm += (dist / 1000);
-                        lastLat = lat; lastLon = lon;
+                        lastLat = lat; 
+                        lastLon = lon;
                         updatePrices();
+                        document.getElementById('statusText').innerText = `GPS Aktif (~${Math.round(acc)}m)`;
                     }
                 }, (err) => {
                     document.getElementById('statusText').innerText = "GPS Sinyali Bekleniyor...";
-                }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+                }, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
             } else {
                 isRunning = false;
                 if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
@@ -244,7 +254,9 @@
                 div.innerHTML = `<div class="history-info" onclick='showDetail(${JSON.stringify(t)})'>
                     <div class="history-date">${t.date}</div>
                     <div class="history-details">📍 ${t.start.substring(0,30)}...<br>💰 <b>${t.total} ₺</b> (${t.distance} km)</div>
-                </div><button class="delete-btn" onclick="delTrip(${t.id})">Sil</button>`;
+                </div><button class="delete-btn" onclick="delTrip(${t.id})">Sil newUser">Sil</button>`;
+                // Düzeltilmiş silme butonu tetikleyicisi:
+                div.querySelector('.delete-btn').onclick = (e) => { e.stopPropagation(); delTrip(t.id); };
                 list.appendChild(div);
             });
             document.getElementById('historyModal').style.display = "block";
@@ -253,6 +265,7 @@
         function delTrip(id) {
             let history = JSON.parse(localStorage.getItem('tripHistory')) || [];
             history = history.filter(t => t.id !== id);
+            localStorage.getItem = JSON.stringify(history); // Düzeltme
             localStorage.setItem('tripHistory', JSON.stringify(history));
             openHistoryModal();
         }
@@ -263,4 +276,3 @@
     </script>
 </body>
 </html>
-
