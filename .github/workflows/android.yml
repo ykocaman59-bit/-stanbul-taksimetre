@@ -29,7 +29,6 @@ jobs:
           npm install @capacitor/core
           npm install -D @capacitor/cli @capacitor/android
           
-          # capacitor.config.json dosyasını doğrudan kodla oluşturuyoruz
           cat << 'EOF' > capacitor.config.json
           {
             "appId": "com.adil.taksimetre",
@@ -39,8 +38,9 @@ jobs:
           }
           EOF
 
-      - name: Generate Android Platform and Build APK
+      - name: Clean, Generate Android Platform and Build APK
         run: |
+          rm -rf android
           npx cap add android
           npx cap copy android
           cd android
