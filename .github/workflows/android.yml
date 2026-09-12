@@ -23,31 +23,26 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Initialize NPM and Install Capacitor
+      - name: Create Config and Install Capacitor
         run: |
           npm init -y
           npm install @capacitor/core
           npm install -D @capacitor/cli @capacitor/android
-          npx cap init "Istanbul-Taksimetre" "com.adil.taksimetre" --web-dir www --yes || true
+          
+          # capacitor.config.json dosyasını doğrudan kodla oluşturuyoruz
+          cat << 'EOF' > capacitor.config.json
+          {
+            "appId": "com.adil.taksimetre",
+            "appName": "Istanbul-Taksimetre",
+            "webDir": "www",
+            "bundledWebRuntime": false
+          }
+          EOF
 
-      - name: Rebuild Android Platform Safely
+      - name: Generate Android Platform and Build APK
         run: |
-          mkdir -p .backup_main
-          if [ -d "android/app/src/main" ]; then
-            cp -r android/app/src/main/* .backup_main/
-            rm -rf android
-          fi
-          
-          npx cap add android || true
-          
-          if [ "$(ls -A .backup_main)" ]; then
-            cp -a .backup_main/. android/app/src/main/
-          fi
-          
+          npx cap add android
           npx cap copy android
-
-      - name: Grant execute permission for gradlew and Build APK
-        run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
