@@ -18,24 +18,27 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Find and Build with Gradle
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies and Initialize Android
         run: |
-          if [ -f "gradlew" ]; then
-            chmod +x gradlew
-            ./gradlew assembleDebug
-          elif [ -f "android/gradlew" ]; then
-            chmod +x android/gradlew
-            cd android && ./gradlew assembleDebug
-          else
-            echo "Gradlew dosyası bulunamadı!"
-            exit 1
-          fi
+          npm install
+          npx cap init --name "Istanbul-Taksimetre" --bundle-id "com.adil.taksimetre" --web-dir www --yes || true
+          npx cap add android || true
+          npx cap copy android
+
+      - name: Grant execute permission for gradlew and Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
       - name: Upload Custom Named APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Istanbul-Taksimetre
-          path: |
-            android/app/build/outputs/apk/debug/*.apk
-            app/build/outputs/apk/debug/*.apk
-            
+          path: android/app/build/outputs/apk/debug/*.apk
+          
