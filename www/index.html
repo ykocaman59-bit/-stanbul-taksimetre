@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İstanbul Taksimetre</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            background: #111; 
+            color: #fff; 
+            margin: 0; 
+            padding: 20px; 
+            -webkit-user-select: none; 
+            user-select: none;         
+        }
+        .meter-box { background: #222; border: 4px solid #f1c40f; border-radius: 15px; padding: 20px; max-width: 400px; margin: auto; box-shadow: 0 0 20px rgba(241, 196, 15, 0.5); }
+        h1 { color: #f1c40f; font-size: 24px; margin-bottom: 5px; }
+        .subtitle { font-size: 11px; color: #aaa; margin-bottom: 15px; line-height: 1.4; }
+        .screen { background: #000; color: #0f0; font-family: monospace; font-size: 36px; padding: 15px; border-radius: 8px; margin: 15px 0; border: 2px solid #333; }
+        .label { font-size: 14px; color: #aaa; }
+        button { background: #e74c3c; color: white; border: none; padding: 12px 20px; font-size: 16px; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 10px; font-weight: bold; }
+        button.start { background: #2ecc71; }
+        .top-buttons { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .top-buttons button { width: 48%; margin: 0; font-size: 12px; padding: 8px 2px; }
+
+        /* Modallar */
+        .modal { display: none; position: fixed; z-index: 10; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); overflow-y: auto; }
+        .modal-content { background-color: #222; margin: 10% auto; padding: 20px; border: 2px solid #f1c40f; width: 85%; max-width: 360px; border-radius: 10px; text-align: left; }
+        .modal-content h3 { color: #f1c40f; margin-top: 0; text-align: center; }
+        .modal-content label { font-size: 13px; color: #ccc; display: block; margin-top: 8px; }
+        .modal-content input { width: 100%; padding: 8px; margin-top: 3px; background: #111; border: 1px solid #444; color: #fff; border-radius: 5px; box-sizing: border-box; }
+        .close-btn { background: #7f8c8d; margin-top: 10px; }
+
+        .history-item { background: #1a1a1a; border: 1px solid #444; padding: 10px; margin-bottom: 8px; border-radius: 6px; text-align: left; display: flex; justify-content: space-between; align-items: center; }
+        .history-info { cursor: pointer; flex-grow: 1; }
+        .history-date { font-size: 11px; color: #f1c40f; font-weight: bold; }
+        .history-details { font-size: 11px; color: #ddd; margin-top: 4px; }
+        .delete-btn { background: #c0392b; color: white; border: none; padding: 6px 10px; border-radius: 5px; cursor: pointer; font-size: 12px; margin-left: 8px; width: auto; }
+        .status-text { font-size: 12px; color: #3498db; margin-top: 5px; min-height: 15px; }
+        .receipt-line { display: flex; justify-content: space-between; font-size: 13px; border-bottom: 1px dashed #444; padding: 4px 0; color: #ccc; }
+        .receipt-line b { color: #fff; }
+    </style>
+</head>
+<body onload="requestInitialPermission()">
+
+    <div class="meter-box">
+        <div class="top-buttons">
+            <button style="background:#3498db;" onclick="openHistoryModal()">📋 Geçmiş</button>
+            <button style="background:#333; color:#f1c40f; border:1px solid #f1c40f;" onclick="openSettingsModal()">⚙️ Tarife</button>
+        </div>
+
+        <h1>İSTANBUL TAKSİ</h1>
+        <div class="subtitle">Adil Hak Koruma Asistanı<br><span style="color:#2ecc71; font-size:10px;">(Gerçek GPS Modu)</span></div>
+        
+        <div class="label">TOPLAM ÜCRET</div>
+        <div class="screen" id="totalPrice">0.00 ₺</div>
+
+        <div style="background: #181818; padding: 10px; border-radius: 6px; margin-bottom: 10px; text-align: left;">
+            <div class="receipt-line"><span>İndi-Bindi Ücreti:</span> <b id="lblMinFee">230.00 ₺</b></div>
+            <div class="receipt-line"><span>KM Başına Ücret:</span> <b id="lblKmRate">71.94 ₺</b></div>
+            <div class="receipt-line"><span>Gidilen Mesafe:</span> <b id="distance">0.00 km</b></div>
+        </div>
+
+        <div class="status-text" id="statusText">Konum izni bekleniyor...</div>
+
+        <button id="toggleBtn" class="start" onclick="toggleMeter()">BAŞLAT</button>
+    </div>
+
+    <!-- TARİFE MODALI -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <h3>Tarife Güncelle</h3>
+            <label>Açılış Ücreti (₺):</label>
+            <input type="number" id="inputOpening" step="0.01">
+            <label>KM Başına Ücret (₺):</label>
+            <input type="number" id="inputKmRate" step="0.01">
+            <label>İndi-Bindi Ücreti (₺):</label>
+            <input type="number" id="inputMinFee" step="0.01">
+            <button onclick="saveTariff()" style="background: #2ecc71;">Kaydet</button>
+            <button class="close-btn" onclick="closeSettingsModal()">İptal</button>
+        </div>
+    </div>
+
+    <!-- GEÇMİŞ MODALI -->
+    <div id="historyModal" class="modal">
+        <div class="modal-content">
+            <h3>Geçmiş Yolculuklar</h3>
+            <div id="historyList" style="max-height: 250px; overflow-y: auto;">
+                <p style="text-align:center; color:#777; font-size:13px;">Kayıt yok.</p>
+            </div>
+            <button class="close-btn" onclick="closeHistoryModal()">Kapat</button>
+        </div>
+    </div>
+
+    <!-- DETAY MODALI -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <h3 style="color: #3498db;">Yolculuk Detayı</h3>
+            <div id="detailContent" style="font-size: 12px; line-height: 1.5; color: #ddd;"></div>
+            <button class="close-btn" onclick="document.getElementById('detailModal').style.display = 'none';">Geri</button>
+        </div>
+    </div>
+
+    <script>
+        let openingFee = parseFloat(localStorage.getItem('openingFee')) || 71.94;
+        let kmRate = parseFloat(localStorage.getItem('kmRate')) || 71.94; 
+        let minFee = parseFloat(localStorage.getItem('minFee')) || 230.00;
+
+        let isRunning = false;
+        let totalKm = 0;
+        let tripStartTime = null;
+        let watchId = null;
+        let lastLat = null;
+        let lastLon = null;
+        let startAddressText = "Konum Alınıyor...";
+        let endAddressText = "Konum Alınıyor...";
+
+        document.getElementById('lblMinFee').innerText = minFee.toFixed(2) + " ₺";
+        document.getElementById('lblKmRate').innerText = kmRate.toFixed(2) + " ₺";
+
+        function requestInitialPermission() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => { document.getElementById('statusText').innerText = "GPS Hazır!"; },
+                    (err) => { document.getElementById('statusText').innerText = "Lütfen konuma izin verin."; },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            }
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; 
+            const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180, Δλ = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+        }
+
+        async function getAddress(lat, lon) {
+            try {
+                let res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18`, { headers: { 'Accept-Language': 'tr' } });
+                let data = await res.json();
+                if (data && data.display_name) return data.display_name;
+            } catch(e) {}
+            return `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+        }
+
+        function toggleMeter() {
+            const btn = document.getElementById('toggleBtn');
+            if (!isRunning) {
+                if (!navigator.geolocation) { alert("GPS desteklenmiyor!"); return; }
+                isRunning = true;
+                btn.innerText = "YOLCULUĞU BİTİR";
+                btn.className = "";
+                totalKm = 0;
+                tripStartTime = new Date();
+                lastLat = null; lastLon = null;
+                document.getElementById('totalPrice').innerText = openingFee.toFixed(2) + " ₺";
+                document.getElementById('distance').innerText = "0.00 km";
+                document.getElementById('statusText').innerText = "GPS uydularına bağlanılıyor...";
+
+                watchId = navigator.geolocation.watchPosition(async (pos) => {
+                    let lat = pos.coords.latitude, lon = pos.coords.longitude, acc = pos.coords.accuracy;
+                    if (lastLat === null) {
+                        lastLat = lat; lastLon = lon;
+                        startAddressText = await getAddress(lat, lon);
+                        document.getElementById('statusText').innerText = `GPS Aktif (~${Math.round(acc)}m)`;
+                        return;
+                    }
+                    if (acc > 45) return; 
+                    let dist = calculateDistance(lastLat, lastLon, lat, lon);
+                    if (dist > 4) {
+                        totalKm += (dist / 1000);
+                        lastLat = lat; lastLon = lon;
+                        updatePrices();
+                    }
+                }, (err) => {
+                    document.getElementById('statusText').innerText = "GPS Sinyali Bekleniyor...";
+                }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+            } else {
+                isRunning = false;
+                if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+                btn.innerText = "BAŞLAT";
+                btn.className = "start";
+                document.getElementById('statusText').innerText = "Yolculuk Kaydedildi!";
+                if (lastLat !== null) {
+                    getAddress(lastLat, lastLon).then(addr => { endAddressText = addr; saveTrip(); });
+                } else {
+                    endAddressText = "Bilinmeyen Konum"; saveTrip();
+                }
+            }
+        }
+
+        function updatePrices() {
+            let calc = openingFee + (totalKm * kmRate);
+            let final = calc < minFee ? minFee : calc;
+            document.getElementById('totalPrice').innerText = final.toFixed(2) + " ₺";
+            document.getElementById('distance').innerText = totalKm.toFixed(2) + " km";
+        }
+
+        function saveTrip() {
+            let calc = openingFee + (totalKm * kmRate);
+            let final = calc < minFee ? minFee : calc;
+            const trip = {
+                id: Date.now(),
+                date: tripStartTime.toLocaleDateString('tr-TR') + " " + tripStartTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                start: startAddressText, end: endAddressText,
+                distance: totalKm.toFixed(2), total: final.toFixed(2)
+            };
+            let history = JSON.parse(localStorage.getItem('tripHistory')) || [];
+            history.unshift(trip);
+            localStorage.setItem('tripHistory', JSON.stringify(history));
+        }
+
+        function openSettingsModal() {
+            document.getElementById('inputOpening').value = openingFee;
+            document.getElementById('inputKmRate').value = kmRate;
+            document.getElementById('inputMinFee').value = minFee;
+            document.getElementById('settingsModal').style.display = "block";
+        }
+        function closeSettingsModal() { document.getElementById('settingsModal').style.display = "none"; }
+        function saveTariff() {
+            openingFee = parseFloat(document.getElementById('inputOpening').value) || 0;
+            kmRate = parseFloat(document.getElementById('inputKmRate').value) || 0;
+            minFee = parseFloat(document.getElementById('inputMinFee').value) || 0;
+            localStorage.setItem('openingFee', openingFee);
+            localStorage.setItem('kmRate', kmRate);
+            localStorage.setItem('minFee', minFee);
+            document.getElementById('lblMinFee').innerText = minFee.toFixed(2) + " ₺";
+            document.getElementById('lblKmRate').innerText = kmRate.toFixed(2) + " ₺";
+            alert("Güncellendi!"); closeSettingsModal();
+        }
+
+        function openHistoryModal() {
+            const list = document.getElementById('historyList');
+            let history = JSON.parse(localStorage.getItem('tripHistory')) || [];
+            if (history.length === 0) { list.innerHTML = '<p style="text-align:center; color:#777; font-size:13px;">Kayıt yok.</p>'; document.getElementById('historyModal').style.display = "block"; return; }
+            list.innerHTML = "";
+            history.forEach(t => {
+                let div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML = `<div class="history-info" onclick='showDetail(${JSON.stringify(t)})'>
+                    <div class="history-date">${t.date}</div>
+                    <div class="history-details">📍 ${t.start.substring(0,30)}...<br>💰 <b>${t.total} ₺</b> (${t.distance} km)</div>
+                </div><button class="delete-btn" onclick="delTrip(${t.id})">Sil</button>`;
+                list.appendChild(div);
+            });
+            document.getElementById('historyModal').style.display = "block";
+        }
+        function closeHistoryModal() { document.getElementById('historyModal').style.display = "none"; }
+        function delTrip(id) {
+            let history = JSON.parse(localStorage.getItem('tripHistory')) || [];
+            history = history.filter(t => t.id !== id);
+            localStorage.setItem('tripHistory', JSON.stringify(history));
+            openHistoryModal();
+        }
+        function showDetail(t) {
+            document.getElementById('detailContent').innerHTML = `<p><b>Tarih:</b> ${t.date}</p><p><b>Kalkış:</b> ${t.start}</p><p><b>Varış:</b> ${t.end}</p><p><b>Mesafe:</b> ${t.distance} km</p><p><b>Toplam:</b> <span style="color:#2ecc71; font-weight:bold;">${t.total} ₺</span></p>`;
+            document.getElementById('detailModal').style.display = "block";
+        }
+    </script>
+</body>
+</html>
+
